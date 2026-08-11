@@ -1,0 +1,36 @@
+import express from "express";
+import { signup , login , logout , checkAuth} from "../controllers/auth.controller.js";
+import { validateSignup , validateLogin } from "../validators/auth.validator.js";
+import { authUser } from "../middlewares/auth.middleware.js";
+
+const authRouter = express.Router();
+
+/**
+ * @route POST /api/auth/signup
+ * @description Register a new user
+ * @access Public
+ */
+authRouter.post("/signup", validateSignup, signup);
+
+/**
+ * @route POST /api/auth/login
+ * @description Login user with email and password.
+ * @access Public
+ */
+authRouter.post("/login", validateLogin, login);
+
+/**
+ * @route POST /api/auth/logout
+ * @description Logout the current user.
+ * @access Public
+ */
+authRouter.post("/logout", logout);
+
+/**
+ * @route GET /api/auth/check
+ * @description Check whether the current user is authenticated.
+ * @access Private
+ */
+authRouter.get("/check", authUser, checkAuth);
+
+export default authRouter;
