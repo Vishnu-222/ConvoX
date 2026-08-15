@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import User from "../models/user.model.js";
 import {generateToken} from "../utils/auth.utils.js";
 import cloudinary from "../config/cloudinary.js";
+import sendWelcomeEmail from "../services/email.service.js";
 
 /**
  * @name signup
@@ -39,6 +40,12 @@ export const signup = async (req, res, next) => {
 
         // Generate JWT and store it in an HTTP-only cookie.
         generateToken(user._id, res);
+
+        try {
+            await sendWelcomeEmail(user.email, user.fullName);
+        } catch (error) {
+            console.error("Failed to send welcome email:", error);
+        }
 
         return res.status(201).json({
             success: true,
