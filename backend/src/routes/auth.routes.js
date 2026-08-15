@@ -1,5 +1,5 @@
 import express from "express";
-import { signup , login , logout , checkAuth} from "../controllers/auth.controller.js";
+import { signup , login , logout , checkAuth , updateProfile} from "../controllers/auth.controller.js";
 import { validateSignup , validateLogin } from "../validators/auth.validator.js";
 import { authUser } from "../middlewares/auth.middleware.js";
 
@@ -32,5 +32,12 @@ authRouter.post("/logout", logout);
  * @access Private
  */
 authRouter.get("/check", authUser, checkAuth);
+
+/**
+ * @route PUT /api/auth/update-profile
+ * @description Update the authenticated user's profile picture.
+ * @access Private
+ */
+authRouter.put("/update-profile", authUser, updateProfile );
 
 export default authRouter;

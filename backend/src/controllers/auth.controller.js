@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import User from "../models/user.model.js";
 import {generateToken} from "../utils/auth.utils.js";
+import cloudinary from "../config/cloudinary.js";
 
 /**
  * @name signup
@@ -154,6 +155,57 @@ export const checkAuth = async (req, res, next) => {
             },
         });
     } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * @name updateProfile
+ * @description Update the authenticated user's profile picture.
+ * @access Private
+ */
+export const updateProfile = async (req, res, next) => {
+    try {
+        const { profilePic } = req.body;
+
+        // Ensure a profile picture was provided.
+        if (!profilePic) {
+            return res.status(400).json({
+                success: false,
+                message: "Profile picture is required.",
+            });
+        }
+
+        // Find the authenticated user from the database.
+        const user = await User.findById(req.user.userId);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found.",
+            });
+        }
+
+        // Upload the profile picture to Cloudinary.
+        const uploadResponse = await cloudinary.uploader.upload(profilePic);
+
+        // Update the user's profile picture with the Cloudinary URL.
+        user.profilePic = uploadResponse.secure_url;
+
+        await user.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Profile picture updated successfully.",
+            user: {
+                id: user._id,
+                fullName: user.fullName,
+                email: user.email,
+                profilePic: user.profilePic,
+            },
+        });
+    } catch (error) {
+        console.error("Update profile error:", error);
         next(error);
     }
 };
