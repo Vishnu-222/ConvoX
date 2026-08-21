@@ -2,6 +2,7 @@ import express from "express";
 import { signup , login , logout , checkAuth , updateProfile} from "../controllers/auth.controller.js";
 import { validateSignup , validateLogin } from "../validators/auth.validator.js";
 import { authUser } from "../middlewares/auth.middleware.js";
+import authRateLimitMiddleware from "../middlewares/auth-rate-limit.middleware.js";
 
 const authRouter = express.Router();
 
@@ -10,14 +11,14 @@ const authRouter = express.Router();
  * @description Register a new user
  * @access Public
  */
-authRouter.post("/signup", validateSignup, signup);
+authRouter.post("/signup", validateSignup, authRateLimitMiddleware , signup);
 
 /**
  * @route POST /api/auth/login
  * @description Login user with email and password.
  * @access Public
  */
-authRouter.post("/login", validateLogin, login);
+authRouter.post("/login", validateLogin, authRateLimitMiddleware, login);
 
 /**
  * @route POST /api/auth/logout
