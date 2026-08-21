@@ -6,7 +6,7 @@ import rateLimit from "express-rate-limit";
  */
 const authRateLimitMiddleware = rateLimit({
     windowMs: 15 * 60 * 1000,
-    limit: 3,
+    limit: 10,
     standardHeaders: "draft-8",
     legacyHeaders: false,
 
