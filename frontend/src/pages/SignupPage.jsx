@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { MessageCircleIcon, LockIcon, MailIcon, UserIcon } from "lucide-react";
-import { Link } from "react-router";
+import { Link , useNavigate } from "react-router";
 import toast from "react-hot-toast";
 import BorderAnimatedContainer from "../components/BorderAnimatedContainer";
 import useAuthStore from "../store/useAuthStore";
@@ -9,6 +9,7 @@ import useAuthStore from "../store/useAuthStore";
 function SignupPage() {
 
     const { signup } = useAuthStore();
+    const navigate = useNavigate();
 
   // Form state
   const [formData, setFormData] = useState({
@@ -23,13 +24,14 @@ function SignupPage() {
     try {
         await signup(formData);
         toast.success("Account created successfully!");
+        navigate("/login");
     } catch (error) {
         toast.error( error.response?.data?.message || "Signup failed");
     }
   };
 
   return (
-    <div className="w-full min-h-screen flex items-center justify-center p-4 bg-slate-900">
+    <div className="relative z-10 w-full flex items-center justify-center">
       <div className="relative w-full max-w-6xl md:h-[800px] h-[650px]">
         <BorderAnimatedContainer>
           <div className="w-full flex flex-col md:flex-row">

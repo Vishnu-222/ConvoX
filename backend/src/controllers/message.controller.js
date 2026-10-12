@@ -10,7 +10,7 @@ import cloudinary from "../config/cloudinary.js";
 export const sendMessage = async (req, res, next) => {
   try {
     const { receiverId } = req.params;
-    const { text, image } = req.body;
+    const { text, image } = req.body || {};
 
     const senderId = req.user.userId;
 

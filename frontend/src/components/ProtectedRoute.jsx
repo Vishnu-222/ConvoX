@@ -9,12 +9,12 @@ function ProtectedRoute({ children }) {
         return null;
     }
 
-    // Not logged in → Login page
+    // Not logged in -> Login page
     if (!user) {
         return <Navigate to="/login" replace />;
     }
 
-    // Logged in → Allow access
+    // Logged in -> Allow access
     return children;
 }
 

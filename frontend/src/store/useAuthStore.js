@@ -5,6 +5,7 @@ const useAuthStore = create((set) => ({
   user: null,
   isCheckingAuth: true,
 
+  // checking authentication status of the user
   checkAuth: async () => {
     try {
       const response = await api.get("/api/auth/check");
@@ -26,6 +27,7 @@ const useAuthStore = create((set) => ({
     }
   },
 
+  // signup user
   signup: async (formData) => {
     try {
       const response = await api.post("/api/auth/signup", formData);
@@ -54,6 +56,41 @@ const useAuthStore = create((set) => ({
       return response.data;
     } catch (error) {
       console.error("Login failed:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  // Logout user
+  logout: async () => {
+    try {
+      await api.post("/api/auth/logout");
+
+      set({
+        user: null,
+      });
+    } catch (error) {
+      console.error("Logout failed:", error.response?.data || error.message);
+
+      throw error;
+    }
+  },
+
+  // Update user profile
+  updateProfile: async (profileData) => {
+    try {
+      const response = await api.put("/api/auth/update-profile", profileData);
+
+      set({
+        user: response.data.user,
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error(
+        "Profile update failed:",
+        error.response?.data || error.message,
+      );
+
       throw error;
     }
   },
