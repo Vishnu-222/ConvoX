@@ -11,6 +11,14 @@ const useChatStore = create((set, get) => ({
   // All registered users except the logged-in user
   allContacts: [],
 
+  // IDs of users currently online according to the server.
+  onlineUsers: [],
+
+  // Update the list of online users received from Socket.io.
+  setOnlineUsers: (userIds) => {
+    set({ onlineUsers: userIds });
+  },
+
   // Messages of the currently selected conversation
   messages: [],
 

@@ -4,7 +4,13 @@ import UsersLoadingSkeleton from "./UsersLoadingSkeleton";
 import NoChatsFound from "./NoChatsFound";
 
 const ChatsList = () => {
-  const { chats, isUsersLoading, getMyChatPartners, setSelectedUser } = useChatStore();
+  const {
+    chats,
+    isUsersLoading,
+    getMyChatPartners,
+    setSelectedUser,
+    onlineUsers,
+  } = useChatStore();
 
   // FETCH EXISTING CHATS
   useEffect(() => {
@@ -40,18 +46,28 @@ const ChatsList = () => {
                 />
               </div>
 
-              {/* Temporary status indicator until Socket.io */}
-              <span
-                className="absolute right-0.5 top-0 size-3 rounded-full border-2 border-slate-800 bg-green-500"
-                title="Online status placeholder"
-              />
+              {/* Show the indicator only when the chat partner is online. */}
+              {onlineUsers.includes(chat._id) && (
+                <span
+                  className="absolute right-0.5 top-0 size-3 rounded-full border-2 border-slate-800 bg-green-500"
+                  title="Online"
+                />
+              )}
             </div>
 
             <div className="min-w-0">
               <h4 className="truncate font-medium text-slate-200">
                 {chat.fullName}
               </h4>
-              <p className="text-xs text-green-400">Online</p>
+              <p
+                className={`text-xs ${
+                  onlineUsers.includes(chat._id)
+                    ? "text-green-400"
+                    : "text-slate-400"
+                }`}
+              >
+                {onlineUsers.includes(chat._id) ? "Online" : "Offline"}
+              </p>
             </div>
           </div>
         </div>

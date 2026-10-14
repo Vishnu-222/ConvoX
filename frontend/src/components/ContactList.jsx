@@ -3,7 +3,13 @@ import useChatStore from "../store/useChatStore";
 import UsersLoadingSkeleton from "./UsersLoadingSkeleton";
 
 const ContactList = () => {
-  const { allContacts, isUsersLoading, getAllContacts, setSelectedUser } = useChatStore();
+  const {
+    allContacts,
+    isUsersLoading,
+    getAllContacts,
+    setSelectedUser,
+    onlineUsers,
+  } = useChatStore();
 
   // FETCH ALL CONTACTS
   useEffect(() => {
@@ -34,18 +40,28 @@ const ContactList = () => {
                 />
               </div>
 
-              {/* Temporary status indicator until Socket.io */}
-              <span
-                className="absolute right-0.5 top-0 size-3 rounded-full border-2 border-slate-800 bg-green-500"
-                title="Online status placeholder"
-              />
+              {/* Show the green indicator only when the contact is online. */}
+              {onlineUsers.includes(contact._id) && (
+                <span
+                  className="absolute right-0.5 top-0 size-3 rounded-full border-2 border-slate-800 bg-green-500"
+                  title="Online"
+                />
+              )}
             </div>
 
             <div className="min-w-0">
               <h4 className="truncate font-medium text-slate-200">
                 {contact.fullName}
               </h4>
-              <p className="text-xs text-green-400">Online</p>
+              <p
+                className={`text-xs ${
+                  onlineUsers.includes(contact._id)
+                    ? "text-green-400"
+                    : "text-slate-400"
+                }`}
+              >
+                {onlineUsers.includes(contact._id) ? "Online" : "Offline"}
+              </p>
             </div>
           </div>
         </div>

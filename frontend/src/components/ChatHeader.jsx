@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import useChatStore from "../store/useChatStore";
 
 function ChatHeader() {
-  const { selectedUser, setSelectedUser } = useChatStore();
+  const { selectedUser, setSelectedUser, onlineUsers } = useChatStore();
 
   // CLOSE CHAT WITH ESCAPE KEY
   useEffect(() => {
@@ -33,17 +33,28 @@ function ChatHeader() {
             />
           </div>
 
-          <span
-            className="absolute right-0.5 top-0 size-3 rounded-full border-2 border-slate-800 bg-green-500"
-            title="Online status placeholder"
-          />
+          {/* Show the green indicator only when the selected user is online. */}
+          {selectedUser && onlineUsers.includes(selectedUser._id) && (
+            <span
+              className="absolute right-0.5 top-0 size-3 rounded-full border-2 border-slate-800 bg-green-500"
+              title="Online"
+            />
+          )}
         </div>
 
         <div className="min-w-0">
           <h3 className="truncate font-medium text-slate-200">
             {selectedUser?.fullName}
           </h3>
-          <p className="text-xs text-green-400">Online</p>
+          <p
+            className={`text-xs ${
+              onlineUsers.includes(selectedUser?._id)
+                ? "text-green-400"
+                : "text-slate-400"
+            }`}
+          >
+            {onlineUsers.includes(selectedUser?._id) ? "Online" : "Offline"}
+          </p>
         </div>
       </div>
 
