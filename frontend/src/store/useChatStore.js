@@ -1,5 +1,10 @@
 import { create } from "zustand";
 import api from "../services/auth.api";
+import { socket } from "../services/socket";
+const notificationSound = new Audio("/sounds/notification.mp3");
+
+// Keep track of this store's own Socket.io listener.
+let newMessageHandler = null;
 
 const useChatStore = create((set, get) => ({
   // Currently selected conversation/user
@@ -27,19 +32,17 @@ const useChatStore = create((set, get) => ({
   isMessagesLoading: false,
 
   // Sound settings
-  
-    // Sound effects preference — follows Chatify
-    isSoundEnabled:
-        JSON.parse(localStorage.getItem("isSoundEnabled")) === true,
 
-    // Toggle sound effects and persist the preference
-    toggleSound: () => {
-        const isSoundEnabled = !get().isSoundEnabled;
+  // Sound effects preference — follows Chatify
+  isSoundEnabled: JSON.parse(localStorage.getItem("isSoundEnabled")) === true,
 
-        localStorage.setItem("isSoundEnabled", isSoundEnabled);
-        set({ isSoundEnabled });
-    },
+  // Toggle sound effects and persist the preference
+  toggleSound: () => {
+    const isSoundEnabled = !get().isSoundEnabled;
 
+    localStorage.setItem("isSoundEnabled", isSoundEnabled);
+    set({ isSoundEnabled });
+  },
 
   // CHAT / CONTACT ACTIONS
   activeTab: "chats",
@@ -107,6 +110,73 @@ const useChatStore = create((set, get) => ({
   // MESSAGE ACTIONS
 
   /**
+   * @name subscribeToMessages
+   * @description Listen for incoming messages from the selected conversation partner.
+   */
+  subscribeToMessages: () => {
+    const { selectedUser } = get();
+
+    if (!selectedUser) return;
+
+    // Remove only the previous listener registered by this store.
+    if (newMessageHandler) {
+      socket.off("newMessage", newMessageHandler);
+    }
+
+    newMessageHandler = (newMessage) => {
+      const currentSelectedUser = get().selectedUser;
+
+      if (!currentSelectedUser) return;
+
+      const selectedUserId = currentSelectedUser._id.toString();
+      const senderId = newMessage.sender.toString();
+      const receiverId = newMessage.receiver.toString();
+
+      // Accept messages belonging to the currently selected conversation.
+      const belongsToConversation =
+        senderId === selectedUserId || receiverId === selectedUserId;
+
+      if (!belongsToConversation) return;
+
+      // Prevent duplicate messages.
+      const alreadyExists = get().messages.some(
+        (message) => message._id === newMessage._id,
+      );
+
+      if (alreadyExists) return;
+      // Debug the sound settings and incoming message.
+      console.log("Incoming message received");
+      console.log("Sound enabled:", get().isSoundEnabled);
+
+      // Play a sound only when notifications are enabled.
+      if (get().isSoundEnabled) {
+        notificationSound.currentTime = 0;
+
+        notificationSound.play().catch((error) => {
+          console.error("Notification sound playback failed:", error);
+        });
+      }
+
+      set((state) => ({
+        messages: [...state.messages, newMessage],
+      }));
+    };
+
+    socket.on("newMessage", newMessageHandler);
+  },
+
+  /**
+   * @name unsubscribeFromMessages
+   * @description Remove this store's incoming-message listener.
+   */
+  unsubscribeFromMessages: () => {
+    if (newMessageHandler) {
+      socket.off("newMessage", newMessageHandler);
+      newMessageHandler = null;
+    }
+  },
+
+  /**
    * @name getMessagesByUserId
    * @description
    * Fetch the complete conversation history with the selected user.
@@ -141,14 +211,11 @@ const useChatStore = create((set, get) => ({
    * @description
    * Select a user and load their conversation.
    */
-  setSelectedUser: async (user) => {
+  setSelectedUser: (user) => {
     set({
       selectedUser: user,
       messages: [],
     });
-
-    // Load conversation history for selected user
-    await useChatStore.getState().getMessagesByUserId(user._id);
   },
 
   /**

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ImageIcon, SendIcon, XIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import useChatStore from "../store/useChatStore";
@@ -6,40 +6,84 @@ import useAuthStore from "../store/useAuthStore";
 import api from "../services/auth.api";
 import useKeyboardSound from "../hooks/useKeyboardSound";
 
+const EMPTY_DRAFT = { text: "", image: null };
+
 function MessageInput() {
-  const [text, setText] = useState("");
-  const [image, setImage] = useState(null);
+  // Keep a separate draft for every conversation.
+  const [drafts, setDrafts] = useState({});
   const [isSending, setIsSending] = useState(false);
 
   const fileInputRef = useRef(null);
+  const inputRef = useRef(null);
 
-  const { selectedUser, messages, isSoundEnabled } = useChatStore();
+  const selectedUser = useChatStore((state) => state.selectedUser);
+  const isSoundEnabled = useChatStore((state) => state.isSoundEnabled);
   const { user } = useAuthStore();
   const { playRandomKeyStrokeSound } = useKeyboardSound();
+
+  const receiverId = selectedUser?._id || selectedUser?.id;
+  const conversationId = receiverId?.toString();
+
+  // Get only the draft belonging to the selected conversation.
+  const activeDraft = conversationId
+    ? drafts[conversationId] || EMPTY_DRAFT
+    : EMPTY_DRAFT;
+
+  const { text, image } = activeDraft;
+
+  // Automatically focus the input when switching chats
+  // and after a message finishes sending.
+  useEffect(() => {
+    if (!isSending) {
+      inputRef.current?.focus();
+    }
+  }, [conversationId, isSending]);
+
+  // Update the current conversation's draft only.
+  const updateDraft = (updates) => {
+    if (!conversationId) return;
+
+    setDrafts((previousDrafts) => ({
+      ...previousDrafts,
+      [conversationId]: {
+        ...(previousDrafts[conversationId] || EMPTY_DRAFT),
+        ...updates,
+      },
+    }));
+  };
 
   // IMAGE SELECTION
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
 
-    if (!file) return;
+    if (!file || !conversationId) return;
 
-    // Only allow image files
     if (!file.type.startsWith("image/")) {
       toast.error("Please select an image file.");
+      e.target.value = "";
       return;
     }
 
-    // Limit image size to 5 MB
     if (file.size > 5 * 1024 * 1024) {
       toast.error("Image size must be less than 5 MB.");
+      e.target.value = "";
       return;
     }
 
-    // Convert image to Base64
+    // Capture the conversation before reading the file.
+    const targetConversationId = conversationId;
     const reader = new FileReader();
 
     reader.onloadend = () => {
-      setImage(reader.result);
+      if (typeof reader.result !== "string") return;
+
+      setDrafts((previousDrafts) => ({
+        ...previousDrafts,
+        [targetConversationId]: {
+          ...(previousDrafts[targetConversationId] || EMPTY_DRAFT),
+          image: reader.result,
+        },
+      }));
     };
 
     reader.onerror = () => {
@@ -49,10 +93,9 @@ function MessageInput() {
     reader.readAsDataURL(file);
   };
 
- 
   // REMOVE SELECTED IMAGE
   const handleRemoveImage = () => {
-    setImage(null);
+    updateDraft({ image: null });
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -63,31 +106,50 @@ function MessageInput() {
   const handleSendMessage = async (e) => {
     e.preventDefault();
 
-    if (!selectedUser || (!text.trim() && !image)) return;
-
+    // Capture the intended recipient and draft before the request.
+    const targetConversationId = conversationId;
+    const targetReceiverId = receiverId;
     const messageText = text.trim();
     const messageImage = image;
-    const receiverId = selectedUser._id;
 
-    // Create a temporary message for immediate UI display
+    if (
+      !targetConversationId ||
+      !targetReceiverId ||
+      (!messageText && !messageImage) ||
+      isSending
+    ) {
+      return;
+    }
+
     const optimisticMessage = {
       _id: `optimistic-${Date.now()}`,
-      senderId: user?._id,
-      receiverId,
+      sender: user?._id || user?.id,
+      receiver: targetReceiverId,
       text: messageText,
       image: messageImage,
       createdAt: new Date().toISOString(),
       isOptimistic: true,
     };
 
-    // Add the temporary message immediately
-    useChatStore.setState((state) => ({
-      messages: [...state.messages, optimisticMessage],
-    }));
+    // Add the temporary message only to its own conversation.
+    useChatStore.setState((state) => {
+      const currentConversationId =
+        (state.selectedUser?._id || state.selectedUser?.id)?.toString();
 
-    // Clear the input immediately
-    setText("");
-    setImage(null);
+      if (currentConversationId !== targetConversationId) {
+        return state;
+      }
+
+      return {
+        messages: [...state.messages, optimisticMessage],
+      };
+    });
+
+    // Clear the submitted conversation's draft.
+    setDrafts((previousDrafts) => ({
+      ...previousDrafts,
+      [targetConversationId]: { ...EMPTY_DRAFT },
+    }));
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -96,39 +158,82 @@ function MessageInput() {
     setIsSending(true);
 
     try {
-      const response = await api.post(`/api/messages/send/${receiverId}`, {
-        text: messageText,
-        image: messageImage,
-      });
+      const response = await api.post(
+        `/api/messages/send/${targetReceiverId}`,
+        {
+          text: messageText,
+          image: messageImage,
+        },
+      );
 
       const savedMessage = response.data.data;
 
-      // Replace the temporary message with the server-saved message
-      useChatStore.setState((state) => ({
-        messages: state.messages.map((message) =>
-          message._id === optimisticMessage._id ? savedMessage : message,
-        ),
-      }));
+      // Update the message only if its conversation is still open.
+      useChatStore.setState((state) => {
+        const currentConversationId =
+          (state.selectedUser?._id || state.selectedUser?.id)?.toString();
+
+        if (currentConversationId !== targetConversationId) {
+          return state;
+        }
+
+        const optimisticExists = state.messages.some(
+          (message) => message._id === optimisticMessage._id,
+        );
+
+        const savedAlreadyExists = state.messages.some(
+          (message) =>
+            message._id?.toString() === savedMessage._id?.toString(),
+        );
+
+        if (optimisticExists) {
+          return {
+            messages: state.messages.map((message) =>
+              message._id === optimisticMessage._id
+                ? savedMessage
+                : message,
+            ),
+          };
+        }
+
+        if (!savedAlreadyExists) {
+          return {
+            messages: [...state.messages, savedMessage],
+          };
+        }
+
+        return state;
+      });
     } catch (error) {
-      // Remove the temporary message if sending fails
-      useChatStore.setState((state) => ({
-        messages: state.messages.filter(
-          (message) => message._id !== optimisticMessage._id,
-        ),
-      }));
+      // Remove the failed temporary message only from its conversation.
+      useChatStore.setState((state) => {
+        const currentConversationId =
+          (state.selectedUser?._id || state.selectedUser?.id)?.toString();
+
+        if (currentConversationId !== targetConversationId) {
+          return state;
+        }
+
+        return {
+          messages: state.messages.filter(
+            (message) => message._id !== optimisticMessage._id,
+          ),
+        };
+      });
 
       console.error(
         "Failed to send message:",
         error.response?.data?.message || error.message,
       );
 
-      toast.error(error.response?.data?.message || "Failed to send message");
+      toast.error(
+        error.response?.data?.message || "Failed to send message",
+      );
     } finally {
       setIsSending(false);
     }
   };
 
-  // UI
   return (
     <div className="p-4 border-t border-slate-700/50">
       {/* IMAGE PREVIEW */}
@@ -160,10 +265,11 @@ function MessageInput() {
       >
         {/* MESSAGE INPUT */}
         <input
+          ref={inputRef}
           type="text"
           value={text}
           onChange={(e) => {
-            setText(e.target.value);
+            updateDraft({ text: e.target.value });
 
             if (isSoundEnabled) {
               playRandomKeyStrokeSound();

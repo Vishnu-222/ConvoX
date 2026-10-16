@@ -60,3 +60,13 @@ export const initializeSocket = (httpServer) => {
 
 // Return the IDs of currently online users.
 export const getOnlineUsers = () => [...onlineUsers.keys()];
+
+/**
+ * @name getUserSocketIds
+ * @description Get all active socket IDs belonging to a user.
+ * @param {string} userId - MongoDB ID of the user.
+ * @returns {string[]} Active socket IDs.
+ */
+export const getUserSocketIds = (userId) => {
+  return [...(onlineUsers.get(userId.toString()) || [])];
+};

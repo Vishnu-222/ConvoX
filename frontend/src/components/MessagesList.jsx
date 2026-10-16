@@ -43,7 +43,9 @@ function MessagesList() {
   return (
     <div className="flex-1 space-y-4 overflow-y-auto p-4">
       {messages.map((message) => {
-        const isMyMessage = message.senderId === user?._id;
+        const currentUserId = user?._id || user?.id;
+
+        const isMyMessage = message.sender?.toString() === currentUserId?.toString();
 
         return (
           <div
@@ -76,7 +78,6 @@ function MessagesList() {
                   {formatMessageTime(message.createdAt)}
                 </p>
               </div>
-
             </div>
           </div>
         );

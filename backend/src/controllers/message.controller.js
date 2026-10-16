@@ -1,6 +1,7 @@
 import User from "../models/user.model.js";
 import Message from "../models/message.model.js";
 import cloudinary from "../config/cloudinary.js";
+import { getIO, getUserSocketIds } from "../config/socket.js";
 
 /**
  * @name sendMessage
@@ -58,6 +59,14 @@ export const sendMessage = async (req, res, next) => {
       image: imageUrl,
     });
 
+    // Deliver the saved message to every active socket of the recipient.
+    const io = getIO();
+    const receiverSocketIds = getUserSocketIds(receiverId);
+
+    receiverSocketIds.forEach((socketId) => {
+      io.to(socketId).emit("newMessage", message);
+    });
+
     return res.status(201).json({
       success: true,
       message: "Message sent successfully.",
@@ -74,51 +83,51 @@ export const sendMessage = async (req, res, next) => {
  * @access Private
  */
 export const getMessagesByUserId = async (req, res, next) => {
-    try {
-        const { userId } = req.params;
-        const currentUserId = req.user.userId;
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user.userId;
 
-        // Prevent requesting a conversation with yourself.
-        if (currentUserId.toString() === userId) {
-            return res.status(400).json({
-                success: false,
-                message: "Cannot fetch messages with yourself.",
-            });
-        }
-
-        // Ensure the requested user exists.
-        const userExists = await User.exists({ _id: userId });
-
-        if (!userExists) {
-            return res.status(404).json({
-                success: false,
-                message: "User not found.",
-            });
-        }
-
-        // Find messages exchanged in both directions.
-        const messages = await Message.find({
-            $or: [
-                {
-                    sender: currentUserId,
-                    receiver: userId,
-                },
-                {
-                    sender: userId,
-                    receiver: currentUserId,
-                },
-            ],
-        }).sort({ createdAt: 1 });
-
-        return res.status(200).json({
-            success: true,
-            message: "Messages fetched successfully.",
-            data: messages,
-        });
-    } catch (error) {
-        console.error("Get messages error:", error);
-        next(error);
+    // Prevent requesting a conversation with yourself.
+    if (currentUserId.toString() === userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot fetch messages with yourself.",
+      });
     }
+
+    // Ensure the requested user exists.
+    const userExists = await User.exists({ _id: userId });
+
+    if (!userExists) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    // Find messages exchanged in both directions.
+    const messages = await Message.find({
+      $or: [
+        {
+          sender: currentUserId,
+          receiver: userId,
+        },
+        {
+          sender: userId,
+          receiver: currentUserId,
+        },
+      ],
+    }).sort({ createdAt: 1 });
+
+    return res.status(200).json({
+      success: true,
+      message: "Messages fetched successfully.",
+      data: messages,
+    });
+  } catch (error) {
+    console.error("Get messages error:", error);
+    next(error);
+  }
 };
 
 /**
@@ -127,24 +136,24 @@ export const getMessagesByUserId = async (req, res, next) => {
  * @access Private
  */
 export const getAllContacts = async (req, res, next) => {
-    try {
-        const currentUserId = req.user.userId;
+  try {
+    const currentUserId = req.user.userId;
 
-        const contacts = await User.find({
-            _id: {
-                $ne: currentUserId,
-            },
-        }).select("-password");
+    const contacts = await User.find({
+      _id: {
+        $ne: currentUserId,
+      },
+    }).select("-password");
 
-        return res.status(200).json({
-            success: true,
-            message: "Contacts fetched successfully.",
-            data: contacts,
-        });
-    } catch (error) {
-        console.error("Get contacts error:", error);
-        next(error);
-    }
+    return res.status(200).json({
+      success: true,
+      message: "Contacts fetched successfully.",
+      data: contacts,
+    });
+  } catch (error) {
+    console.error("Get contacts error:", error);
+    next(error);
+  }
 };
 
 /**
@@ -153,43 +162,40 @@ export const getAllContacts = async (req, res, next) => {
  * @access Private
  */
 export const getChatPartners = async (req, res, next) => {
-    try {
-        const currentUserId = req.user.userId;
+  try {
+    const currentUserId = req.user.userId;
 
-        // Find all messages involving the authenticated user.
-        const messages = await Message.find({
-            $or: [
-                { sender: currentUserId },
-                { receiver: currentUserId },
-            ],
-        }).select("sender receiver");
+    // Find all messages involving the authenticated user.
+    const messages = await Message.find({
+      $or: [{ sender: currentUserId }, { receiver: currentUserId }],
+    }).select("sender receiver");
 
-        // Collect unique user IDs from the conversations.
-        const partnerIds = new Set();
+    // Collect unique user IDs from the conversations.
+    const partnerIds = new Set();
 
-        messages.forEach((message) => {
-            const partnerId =
-                message.sender.toString() === currentUserId.toString()
-                    ? message.receiver.toString()
-                    : message.sender.toString();
+    messages.forEach((message) => {
+      const partnerId =
+        message.sender.toString() === currentUserId.toString()
+          ? message.receiver.toString()
+          : message.sender.toString();
 
-            partnerIds.add(partnerId);
-        });
+      partnerIds.add(partnerId);
+    });
 
-        // Fetch the users who are actual chat partners.
-        const chatPartners = await User.find({
-            _id: {
-                $in: [...partnerIds],
-            },
-        }).select("-password");
+    // Fetch the users who are actual chat partners.
+    const chatPartners = await User.find({
+      _id: {
+        $in: [...partnerIds],
+      },
+    }).select("-password");
 
-        return res.status(200).json({
-            success: true,
-            message: "Chat partners fetched successfully.",
-            data: chatPartners,
-        });
-    } catch (error) {
-        console.error("Get chat partners error:", error);
-        next(error);
-    }
+    return res.status(200).json({
+      success: true,
+      message: "Chat partners fetched successfully.",
+      data: chatPartners,
+    });
+  } catch (error) {
+    console.error("Get chat partners error:", error);
+    next(error);
+  }
 };
