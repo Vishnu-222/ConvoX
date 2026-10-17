@@ -1,9 +1,9 @@
 import mongoose from "mongoose";
 
 // Force Node.js to use Google DNS
-import dns from "dns";
-dns.setDefaultResultOrder("ipv4first");
-dns.setServers(["8.8.8.8", "8.8.4.4"]);
+// import dns from "dns";
+// dns.setDefaultResultOrder("ipv4first");
+// dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 const connectToDatabase = async () => {
     try {
