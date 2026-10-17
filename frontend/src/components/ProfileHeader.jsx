@@ -9,7 +9,10 @@ const mouseClickSound = new Audio("/sounds/mouse-click.mp3");
 
 function ProfileHeader() {
   const { user, logout, updateProfile } = useAuthStore();
-  const { isSoundEnabled, toggleSound } = useChatStore();
+  const { isSoundEnabled, toggleSound, onlineUsers } = useChatStore();
+
+  const userId = String(user?._id || user?.id || "");
+  const isOnline = onlineUsers.includes(userId);
 
   const navigate = useNavigate();
 
@@ -100,7 +103,7 @@ function ProfileHeader() {
         {/* PROFILE */}
         <div className="flex items-center gap-3">
           {/* AVATAR */}
-          <div className="avatar online">
+          <div className={`avatar ${isOnline ? "online" : ""}`}>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -137,7 +140,9 @@ function ProfileHeader() {
               {user?.fullName || "User"}
             </h3>
 
-            <p className="text-xs text-slate-400">Online</p>
+            <p className={`text-xs ${isOnline ? "text-green-400" : "text-slate-400"}`}>
+              {isOnline ? "Online" : "Offline"}
+            </p>
           </div>
         </div>
 
