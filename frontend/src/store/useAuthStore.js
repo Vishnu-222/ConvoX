@@ -27,15 +27,12 @@ const useAuthStore = create((set) => ({
     }
   },
 
-  // signup user
+  // Signup user
   signup: async (formData) => {
     try {
       const response = await api.post("/api/auth/signup", formData);
 
-      set({
-        user: response.data.user,
-      });
-
+      // Return the response without automatically logging the user in.
       return response.data;
     } catch (error) {
       console.error("Signup failed:", error.response?.data || error.message);

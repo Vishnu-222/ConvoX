@@ -84,15 +84,15 @@ const useChatStore = create((set, get) => ({
    * @description
    * Fetch users with whom the logged-in user has already exchanged messages.
    */
-  getMyChatPartners: async () => {
-    set({ isUsersLoading: true });
+  getMyChatPartners: async (silent = false) => {
+    if (!silent) set({ isUsersLoading: true });
 
     try {
       const response = await api.get("/api/messages/chats");
 
       set({
         chats: response.data.data,
-        isUsersLoading: false,
+        ...(silent ? {} : { isUsersLoading: false }),
       });
     } catch (error) {
       console.error(
@@ -100,10 +100,9 @@ const useChatStore = create((set, get) => ({
         error.response?.data?.message || error.message,
       );
 
-      set({
-        chats: [],
-        isUsersLoading: false,
-      });
+      if (!silent) {
+        set({ chats: [], isUsersLoading: false });
+      }
     }
   },
 

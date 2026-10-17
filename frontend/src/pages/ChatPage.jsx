@@ -6,9 +6,24 @@ import ContactList from "../components/ContactList";
 import NoConversationPlaceholder from "../components/NoConversationPlaceholder";
 import ChatContainer from "../components/ChatContainer";
 import useChatStore from "../store/useChatStore";
+import { useEffect } from "react";
+import { socket } from "../services/socket";
 
 const ChatPage = () => {
   const { selectedUser, activeTab, setActiveTab } = useChatStore();
+  const getMyChatPartners = useChatStore((state) => state.getMyChatPartners);
+
+  useEffect(() => {
+    const handleNewMessage = () => {
+      getMyChatPartners(true);
+    };
+
+    socket.on("newMessage", handleNewMessage);
+
+    return () => {
+      socket.off("newMessage", handleNewMessage);
+    };
+  }, [getMyChatPartners]);
 
   return (
     <div className="relative mx-auto h-[800px] w-full max-w-6xl">

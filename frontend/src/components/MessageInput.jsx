@@ -133,8 +133,9 @@ function MessageInput() {
 
     // Add the temporary message only to its own conversation.
     useChatStore.setState((state) => {
-      const currentConversationId =
-        (state.selectedUser?._id || state.selectedUser?.id)?.toString();
+      const currentConversationId = (
+        state.selectedUser?._id || state.selectedUser?.id
+      )?.toString();
 
       if (currentConversationId !== targetConversationId) {
         return state;
@@ -167,11 +168,14 @@ function MessageInput() {
       );
 
       const savedMessage = response.data.data;
+      // Refresh the chat list after successfully sending a message.
+      useChatStore.getState().getMyChatPartners(true);
 
       // Update the message only if its conversation is still open.
       useChatStore.setState((state) => {
-        const currentConversationId =
-          (state.selectedUser?._id || state.selectedUser?.id)?.toString();
+        const currentConversationId = (
+          state.selectedUser?._id || state.selectedUser?.id
+        )?.toString();
 
         if (currentConversationId !== targetConversationId) {
           return state;
@@ -182,16 +186,13 @@ function MessageInput() {
         );
 
         const savedAlreadyExists = state.messages.some(
-          (message) =>
-            message._id?.toString() === savedMessage._id?.toString(),
+          (message) => message._id?.toString() === savedMessage._id?.toString(),
         );
 
         if (optimisticExists) {
           return {
             messages: state.messages.map((message) =>
-              message._id === optimisticMessage._id
-                ? savedMessage
-                : message,
+              message._id === optimisticMessage._id ? savedMessage : message,
             ),
           };
         }
@@ -207,8 +208,9 @@ function MessageInput() {
     } catch (error) {
       // Remove the failed temporary message only from its conversation.
       useChatStore.setState((state) => {
-        const currentConversationId =
-          (state.selectedUser?._id || state.selectedUser?.id)?.toString();
+        const currentConversationId = (
+          state.selectedUser?._id || state.selectedUser?.id
+        )?.toString();
 
         if (currentConversationId !== targetConversationId) {
           return state;
@@ -226,9 +228,7 @@ function MessageInput() {
         error.response?.data?.message || error.message,
       );
 
-      toast.error(
-        error.response?.data?.message || "Failed to send message",
-      );
+      toast.error(error.response?.data?.message || "Failed to send message");
     } finally {
       setIsSending(false);
     }
