@@ -9,14 +9,14 @@ import useKeyboardSound from "../hooks/useKeyboardSound";
 const EMPTY_DRAFT = { text: "", image: null };
 
 function MessageInput() {
-  // Keep a separate draft for every conversation.
-  const [drafts, setDrafts] = useState({});
   const [isSending, setIsSending] = useState(false);
 
   const fileInputRef = useRef(null);
   const inputRef = useRef(null);
 
   const selectedUser = useChatStore((state) => state.selectedUser);
+  const messageDrafts = useChatStore((state) => state.messageDrafts);
+  const updateMessageDraft = useChatStore((state) => state.updateMessageDraft);
   const isSoundEnabled = useChatStore((state) => state.isSoundEnabled);
   const { user } = useAuthStore();
   const { playRandomKeyStrokeSound } = useKeyboardSound();
@@ -26,7 +26,7 @@ function MessageInput() {
 
   // Get only the draft belonging to the selected conversation.
   const activeDraft = conversationId
-    ? drafts[conversationId] || EMPTY_DRAFT
+    ? messageDrafts[conversationId] || EMPTY_DRAFT
     : EMPTY_DRAFT;
 
   const { text, image } = activeDraft;
@@ -39,17 +39,9 @@ function MessageInput() {
     }
   }, [conversationId, isSending]);
 
-  // Update the current conversation's draft only.
+  // Update only the current conversation's draft.
   const updateDraft = (updates) => {
-    if (!conversationId) return;
-
-    setDrafts((previousDrafts) => ({
-      ...previousDrafts,
-      [conversationId]: {
-        ...(previousDrafts[conversationId] || EMPTY_DRAFT),
-        ...updates,
-      },
-    }));
+    updateMessageDraft(conversationId, updates);
   };
 
   // IMAGE SELECTION
@@ -77,13 +69,9 @@ function MessageInput() {
     reader.onloadend = () => {
       if (typeof reader.result !== "string") return;
 
-      setDrafts((previousDrafts) => ({
-        ...previousDrafts,
-        [targetConversationId]: {
-          ...(previousDrafts[targetConversationId] || EMPTY_DRAFT),
-          image: reader.result,
-        },
-      }));
+      updateMessageDraft(targetConversationId, {
+        image: reader.result,
+      });
     };
 
     reader.onerror = () => {
@@ -147,10 +135,7 @@ function MessageInput() {
     });
 
     // Clear the submitted conversation's draft.
-    setDrafts((previousDrafts) => ({
-      ...previousDrafts,
-      [targetConversationId]: { ...EMPTY_DRAFT },
-    }));
+    updateMessageDraft(targetConversationId, { ...EMPTY_DRAFT });
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -235,7 +220,7 @@ function MessageInput() {
   };
 
   return (
-    <div className="p-4 border-t border-slate-700/50">
+    <div className="shrink-0 border-t border-slate-700/50 p-3 sm:p-4">
       {/* IMAGE PREVIEW */}
       {image && (
         <div className="max-w-3xl mx-auto mb-3 flex items-center">
@@ -261,7 +246,7 @@ function MessageInput() {
       {/* MESSAGE FORM */}
       <form
         onSubmit={handleSendMessage}
-        className="max-w-3xl mx-auto flex space-x-4"
+        className="mx-auto flex w-full max-w-3xl min-w-0 gap-2 sm:gap-4"
       >
         {/* MESSAGE INPUT */}
         <input
@@ -276,7 +261,7 @@ function MessageInput() {
             }
           }}
           disabled={isSending}
-          className="flex-1 bg-slate-800/50 border border-slate-700/50 rounded-lg py-2 px-4 text-slate-200 outline-none focus:border-cyan-500/50"
+          className="min-w-0 flex-1 rounded-lg border border-slate-700/50 bg-slate-800/50 px-3 py-2 text-slate-200 outline-none focus:border-cyan-500/50 sm:px-4"
           placeholder="Type your message..."
         />
 
@@ -294,7 +279,7 @@ function MessageInput() {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isSending}
-          className={`bg-slate-800/50 text-slate-400 hover:text-slate-200 rounded-lg px-4 transition-colors ${
+          className={`shrink-0 rounded-lg bg-slate-800/50 px-3 text-slate-400 transition-colors hover:text-slate-200 sm:px-4 ${
             image ? "text-cyan-500" : ""
           }`}
         >
@@ -305,7 +290,7 @@ function MessageInput() {
         <button
           type="submit"
           disabled={isSending || (!text.trim() && !image)}
-          className="bg-gradient-to-r from-cyan-500 to-cyan-600 text-white rounded-lg px-4 py-2 font-medium hover:from-cyan-600 hover:to-cyan-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="shrink-0 rounded-lg bg-gradient-to-r from-cyan-500 to-cyan-600 px-3 py-2 font-medium text-white transition-all hover:from-cyan-600 hover:to-cyan-700 disabled:cursor-not-allowed disabled:opacity-50 sm:px-4"
         >
           <SendIcon className="w-5 h-5" />
         </button>

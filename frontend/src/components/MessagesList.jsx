@@ -20,15 +20,23 @@ function MessagesList() {
 
   const messagesEndRef = useRef(null);
 
-  // Automatically scroll to the latest message
+  // Scroll to the latest message after conversation history has loaded.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (isMessagesLoading || messages.length === 0) return;
+
+    // Wait for the updated message list to render before scrolling.
+    requestAnimationFrame(() => {
+      if (messagesEndRef.current) {
+        messagesEndRef.current.parentElement.scrollTop =
+          messagesEndRef.current.parentElement.scrollHeight;
+      }
+    });
+  }, [messages, isMessagesLoading]);
 
   // LOADING STATE
   if (isMessagesLoading) {
     return (
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
         <MessagesLoadingSkeleton />
       </div>
     );
@@ -41,18 +49,19 @@ function MessagesList() {
 
   // MESSAGE LIST
   return (
-    <div className="flex-1 space-y-4 overflow-y-auto p-4">
+    <div className="min-h-0 min-w-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto p-3 sm:space-y-4 sm:p-4">
       {messages.map((message) => {
         const currentUserId = user?._id || user?.id;
 
-        const isMyMessage = message.sender?.toString() === currentUserId?.toString();
+        const isMyMessage =
+          message.sender?.toString() === currentUserId?.toString();
 
         return (
           <div
             key={message._id}
             className={`flex ${isMyMessage ? "justify-end" : "justify-start"}`}
           >
-            <div className="max-w-[70%]">
+            <div className="min-w-0 max-w-[85%] sm:max-w-[70%]">
               <div
                 className={`rounded-2xl px-4 py-2 ${
                   isMyMessage
@@ -64,7 +73,7 @@ function MessagesList() {
                   <img
                     src={message.image}
                     alt="Message attachment"
-                    className="mb-2 max-w-full rounded-lg"
+                    className="mb-2 h-auto max-w-full rounded-lg object-contain"
                   />
                 )}
 

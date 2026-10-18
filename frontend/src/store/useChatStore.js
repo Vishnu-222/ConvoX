@@ -5,10 +5,34 @@ const notificationSound = new Audio("/sounds/notification.mp3");
 
 // Keep track of this store's own Socket.io listener.
 let newMessageHandler = null;
+let messagesRequestId = 0;
 
 const useChatStore = create((set, get) => ({
   // Currently selected conversation/user
   selectedUser: null,
+
+  // Preserve message drafts separately for each conversation.
+  messageDrafts: {},
+
+  /**
+   * @name updateMessageDraft
+   * @description Save a text or image draft for a specific conversation.
+   */
+  updateMessageDraft: (conversationId, updates) => {
+    if (!conversationId) return;
+
+    set((state) => ({
+      messageDrafts: {
+        ...state.messageDrafts,
+        [conversationId]: {
+          text: "",
+          image: null,
+          ...(state.messageDrafts[conversationId] || {}),
+          ...updates,
+        },
+      },
+    }));
+  },
 
   // Users with whom the logged-in user has existing conversations
   chats: [],
@@ -178,19 +202,37 @@ const useChatStore = create((set, get) => ({
   /**
    * @name getMessagesByUserId
    * @description
-   * Fetch the complete conversation history with the selected user.
+   * Fetch conversation history while preventing stale requests
+   * from overwriting the currently selected conversation.
    */
   getMessagesByUserId: async (userId) => {
+    const requestId = ++messagesRequestId;
+
     set({ isMessagesLoading: true });
 
     try {
       const response = await api.get(`/api/messages/messages/${userId}`);
+
+      // Ignore responses from older conversation requests.
+      if (requestId !== messagesRequestId) return;
+
+      // Ensure the requested user is still selected.
+      const currentSelectedUserId = get().selectedUser?._id?.toString();
+
+      if (currentSelectedUserId !== userId.toString()) return;
 
       set({
         messages: response.data.data,
         isMessagesLoading: false,
       });
     } catch (error) {
+      // Ignore errors from requests that are no longer current.
+      if (requestId !== messagesRequestId) return;
+
+      const currentSelectedUserId = get().selectedUser?._id?.toString();
+
+      if (currentSelectedUserId !== userId.toString()) return;
+
       console.error(
         "Failed to fetch messages:",
         error.response?.data?.message || error.message,

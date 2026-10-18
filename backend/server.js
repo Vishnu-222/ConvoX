@@ -18,4 +18,7 @@ const startServer = async () => {
     });
 };
 
-startServer();
+startServer().catch((error) => {
+    console.error("Failed to start ConvoX server:", error.message);
+    process.exit(1);
+});
