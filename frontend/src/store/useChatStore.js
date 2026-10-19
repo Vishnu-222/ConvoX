@@ -270,6 +270,67 @@ const useChatStore = create((set, get) => ({
       messages: [],
     });
   },
+
+  /**
+   * @name handleConversationDeleted
+   * @description
+   * Handle a conversation deleted by either participant.
+   */
+  handleConversationDeleted: (partnerId) => {
+    if (!partnerId) return;
+
+    const deletedPartnerId = partnerId.toString();
+
+    set((state) => {
+      const isSelected =
+        state.selectedUser?._id?.toString() === deletedPartnerId;
+
+      // Remove only this conversation's saved draft.
+      const nextDrafts = { ...state.messageDrafts };
+      delete nextDrafts[deletedPartnerId];
+
+      return {
+        // Remove the partner from the chat list.
+        chats: state.chats.filter(
+          (chat) => chat._id?.toString() !== deletedPartnerId,
+        ),
+
+        // Close the conversation only if it is currently open.
+        selectedUser: isSelected ? null : state.selectedUser,
+        messages: isSelected ? [] : state.messages,
+        isMessagesLoading: isSelected ? false : state.isMessagesLoading,
+
+        // Preserve drafts belonging to every other conversation.
+        messageDrafts: nextDrafts,
+      };
+    });
+  },
+
+  /**
+   * @name deleteConversation
+   * @description
+   * Delete a conversation for both participants.
+   */
+  deleteConversation: async (partnerId) => {
+    try {
+      await api.delete(`/api/messages/conversation/${partnerId}`);
+
+      // Update the current user's UI after the backend confirms deletion.
+      get().handleConversationDeleted(partnerId);
+
+      // Refresh the chat list from the database.
+      await get().getMyChatPartners(true);
+
+      return true;
+    } catch (error) {
+      console.error(
+        "Delete conversation error:",
+        error.response?.data?.message || error.message,
+      );
+
+      throw error;
+    }
+  },
 }));
 
 export default useChatStore;

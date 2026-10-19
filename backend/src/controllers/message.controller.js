@@ -132,7 +132,7 @@ export const getMessagesByUserId = async (req, res, next) => {
 
 /**
  * @name getAllContacts
- * @description Get all users except the authenticated user.
+ * @description Get all users except the authenticated user, sorted alphabetically.
  * @access Private
  */
 export const getAllContacts = async (req, res, next) => {
@@ -143,7 +143,10 @@ export const getAllContacts = async (req, res, next) => {
       _id: {
         $ne: currentUserId,
       },
-    }).select("-password");
+    })
+      .select("-password")
+      .collation({ locale: "en", strength: 2 })
+      .sort({ fullName: 1 });
 
     return res.status(200).json({
       success: true,
@@ -158,44 +161,125 @@ export const getAllContacts = async (req, res, next) => {
 
 /**
  * @name getChatPartners
- * @description Get all users who have exchanged messages with the authenticated user.
+ * @description Get chat partners ordered by their most recent message.
  * @access Private
  */
 export const getChatPartners = async (req, res, next) => {
   try {
     const currentUserId = req.user.userId;
 
-    // Find all messages involving the authenticated user.
+    // Fetch the newest messages first.
     const messages = await Message.find({
       $or: [{ sender: currentUserId }, { receiver: currentUserId }],
-    }).select("sender receiver");
+    })
+      .select("sender receiver createdAt")
+      .sort({ createdAt: -1, _id: -1 });
 
-    // Collect unique user IDs from the conversations.
-    const partnerIds = new Set();
+    // The first message encountered for each partner is their
+    // most recent conversation activity.
+    const partnerIds = [];
+    const seenPartnerIds = new Set();
 
-    messages.forEach((message) => {
+    for (const message of messages) {
       const partnerId =
         message.sender.toString() === currentUserId.toString()
           ? message.receiver.toString()
           : message.sender.toString();
 
-      partnerIds.add(partnerId);
-    });
+      if (!seenPartnerIds.has(partnerId)) {
+        seenPartnerIds.add(partnerId);
+        partnerIds.push(partnerId);
+      }
+    }
 
-    // Fetch the users who are actual chat partners.
+    // Fetch the partner profiles.
     const chatPartners = await User.find({
-      _id: {
-        $in: [...partnerIds],
-      },
+      _id: { $in: partnerIds },
     }).select("-password");
+
+    // MongoDB's $in query does not guarantee our requested order.
+    // Restore the most-recent-first order explicitly.
+    const partnersById = new Map(
+      chatPartners.map((partner) => [partner._id.toString(), partner]),
+    );
+
+    const sortedChatPartners = partnerIds
+      .map((partnerId) => partnersById.get(partnerId))
+      .filter(Boolean);
 
     return res.status(200).json({
       success: true,
       message: "Chat partners fetched successfully.",
-      data: chatPartners,
+      data: sortedChatPartners,
     });
   } catch (error) {
     console.error("Get chat partners error:", error);
     next(error);
   }
 };
+
+
+/**
+ * @name deleteConversation
+ * @description Delete all messages exchanged between two users.
+ * @access Private
+ */
+export const deleteConversation = async (req, res, next) => {
+  try {
+    const currentUserId = req.user.userId;
+    const { userId: partnerId } = req.params;
+
+    // Prevent deleting a conversation with yourself.
+    if (currentUserId.toString() === partnerId) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot delete a conversation with yourself.",
+      });
+    }
+
+    // Ensure the other participant exists.
+    const partnerExists = await User.exists({ _id: partnerId });
+
+    if (!partnerExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Chat partner not found.",
+      });
+    }
+
+    // Delete messages in both directions.
+    const result = await Message.deleteMany({
+      $or: [
+        { sender: currentUserId, receiver: partnerId },
+        { sender: partnerId, receiver: currentUserId },
+      ],
+    });
+
+    // Silently update all active sessions belonging to both users.
+    const io = getIO();
+
+    getUserSocketIds(currentUserId.toString()).forEach((socketId) => {
+      io.to(socketId).emit("conversationDeleted", {
+        partnerId: partnerId.toString(),
+      });
+    });
+
+    getUserSocketIds(partnerId).forEach((socketId) => {
+      io.to(socketId).emit("conversationDeleted", {
+        partnerId: currentUserId.toString(),
+      });
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Conversation deleted successfully.",
+      data: {
+        deletedCount: result.deletedCount,
+      },
+    });
+  } catch (error) {
+    console.error("Delete conversation error:", error);
+    next(error);
+  }
+};
+

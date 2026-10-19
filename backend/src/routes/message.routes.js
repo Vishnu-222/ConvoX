@@ -1,5 +1,5 @@
 import express from "express";
-import {sendMessage , getMessagesByUserId , getAllContacts , getChatPartners} from "../controllers/message.controller.js";
+import {sendMessage , getMessagesByUserId , getAllContacts , getChatPartners , deleteConversation} from "../controllers/message.controller.js";
 import { authUser } from "../middlewares/auth.middleware.js";
 
 const messageRouter = express.Router();
@@ -24,6 +24,13 @@ messageRouter.get("/contacts", authUser, getAllContacts);
  * @access Private
  */
 messageRouter.get("/chats", authUser, getChatPartners);
+
+/**
+ * @route DELETE /api/messages/conversation/:userId
+ * @description Delete a conversation and its messages for both participants.
+ * @access Private
+ */
+messageRouter.delete("/conversation/:userId", authUser, deleteConversation);
 
 /**
  * @route GET /api/messages/:userId

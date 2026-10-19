@@ -26,6 +26,19 @@ const ChatPage = () => {
     };
   }, [getMyChatPartners]);
 
+  // Listen for conversations deleted by either participant.
+  useEffect(() => {
+    const handleConversationDeleted = ({ partnerId }) => {
+      useChatStore.getState().handleConversationDeleted(partnerId);
+    };
+
+    socket.on("conversationDeleted", handleConversationDeleted);
+
+    return () => {
+      socket.off("conversationDeleted", handleConversationDeleted);
+    };
+  }, []);
+
   return (
     <div className="relative mx-auto h-[calc(100dvh-2rem)] min-h-0 w-full max-w-6xl md:h-[700px]">
       <BorderAnimatedContainer>

@@ -1,7 +1,10 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import useChatStore from "../store/useChatStore";
 import UsersLoadingSkeleton from "./UsersLoadingSkeleton";
 import NoChatsFound from "./NoChatsFound";
+import DeleteConversationModal from "./DeleteConversationModal";
+import { Trash2 } from "lucide-react";
+import toast from "react-hot-toast";
 
 const ChatsList = () => {
   const {
@@ -10,7 +13,10 @@ const ChatsList = () => {
     getMyChatPartners,
     setSelectedUser,
     onlineUsers,
+    deleteConversation,
   } = useChatStore();
+
+  const [conversationToDelete, setConversationToDelete] = useState(null);
 
   // FETCH EXISTING CHATS
   useEffect(() => {
@@ -27,16 +33,22 @@ const ChatsList = () => {
     return <NoChatsFound />;
   }
 
+  const handleDeleteConversation = (event, partner) => {
+    event.stopPropagation();
+    setConversationToDelete(partner);
+  };
+
   // CHAT LIST
   return (
     <>
       {chats.map((chat) => (
         <div
           key={chat._id}
-          className="bg-cyan-500/10 p-4 rounded-lg cursor-pointer hover:bg-cyan-500/20 transition-colors"
+          className="group flex items-center justify-between gap-2 bg-cyan-500/10 p-4 rounded-lg cursor-pointer hover:bg-cyan-500/20 transition-colors"
           onClick={() => setSelectedUser(chat)}
         >
-          <div className="flex items-center gap-3">
+          {/* Existing chat partner information */}
+          <div className="flex min-w-0 items-center gap-3">
             <div className="relative shrink-0">
               <div className="size-12 overflow-hidden rounded-full">
                 <img
@@ -59,6 +71,7 @@ const ChatsList = () => {
               <h4 className="truncate font-medium text-slate-200">
                 {chat.fullName}
               </h4>
+
               <p
                 className={`text-xs ${
                   onlineUsers.includes(chat._id)
@@ -70,8 +83,24 @@ const ChatsList = () => {
               </p>
             </div>
           </div>
+
+          {/* Delete this conversation for both participants. */}
+          <button
+            type="button"
+            aria-label={`Delete conversation with ${chat.fullName}`}
+            title="Delete conversation"
+            onClick={(event) => handleDeleteConversation(event, chat)}
+            className="shrink-0 rounded-full p-2 text-slate-400 transition-colors outline-none focus:outline-none focus-visible:outline-none active:bg-red-500/10 active:text-red-400 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 sm:hover:bg-red-500/10 sm:hover:text-red-400"
+          >
+            <Trash2 size={17} />
+          </button>
         </div>
       ))}
+
+      <DeleteConversationModal
+        partner={conversationToDelete}
+        onClose={() => setConversationToDelete(null)}
+      />
     </>
   );
 };
