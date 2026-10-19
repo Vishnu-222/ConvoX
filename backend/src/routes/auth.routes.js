@@ -1,5 +1,5 @@
 import express from "express";
-import { signup , login , logout , checkAuth , updateProfile} from "../controllers/auth.controller.js";
+import { signup , login , logout , checkAuth , updateProfile , updateFullName } from "../controllers/auth.controller.js";
 import { validateSignup , validateLogin } from "../validators/auth.validator.js";
 import { authUser } from "../middlewares/auth.middleware.js";
 import authRateLimitMiddleware from "../middlewares/auth-rate-limit.middleware.js";
@@ -40,5 +40,12 @@ authRouter.get("/check", authUser, checkAuth);
  * @access Private
  */
 authRouter.put("/update-profile", authUser, updateProfile );
+
+/**
+ * @route PATCH /api/auth/update-name
+ * @description Update the authenticated user's full name.
+ * @access Private
+ */
+authRouter.patch("/update-name", authUser, updateFullName);
 
 export default authRouter;

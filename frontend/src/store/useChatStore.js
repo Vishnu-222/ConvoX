@@ -248,6 +248,38 @@ const useChatStore = create((set, get) => ({
   // SELECTED USER ACTIONS
 
   /**
+   * @name updateUserFullName
+   * @description Update a user's name across all chat-related UI state.
+   */
+  updateUserFullName: (userId, fullName) => {
+    if (!userId || !fullName) return;
+
+    const updatedUserId = userId.toString();
+
+    const updateName = (user) => {
+      if (!user || user._id?.toString() !== updatedUserId) {
+        return user;
+      }
+
+      return {
+        ...user,
+        fullName,
+      };
+    };
+
+    set((state) => ({
+      // Update the user's name in the contacts list.
+      allContacts: state.allContacts.map(updateName),
+
+      // Update the user's name in the existing chats list.
+      chats: state.chats.map(updateName),
+
+      // Update the chat header if this user is currently selected.
+      selectedUser: updateName(state.selectedUser),
+    }));
+  },
+
+  /**
    * @name setSelectedUser
    * @description
    * Select a user and load their conversation.

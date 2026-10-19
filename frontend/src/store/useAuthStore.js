@@ -91,6 +91,36 @@ const useAuthStore = create((set) => ({
       throw error;
     }
   },
+
+  // Update only the logged-in user's full name.
+  updateFullName: async (fullName) => {
+    try {
+      const response = await api.patch("/api/auth/update-name", {
+        fullName,
+      });
+
+      const updatedFullName = response.data.user.fullName;
+
+      // Preserve the user's ID, email, profile picture, and all other fields.
+      set((state) => ({
+        user: state.user
+          ? {
+              ...state.user,
+              fullName: updatedFullName,
+            }
+          : state.user,
+      }));
+
+      return response.data;
+    } catch (error) {
+      console.error(
+        "Full name update failed:",
+        error.response?.data || error.message,
+      );
+
+      throw error;
+    }
+  },
 }));
 
 export default useAuthStore;

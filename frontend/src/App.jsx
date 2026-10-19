@@ -10,6 +10,7 @@ import { socket } from "./services/socket";
 function App() {
   const { checkAuth, user, isCheckingAuth } = useAuthStore();
   const setOnlineUsers = useChatStore((state) => state.setOnlineUsers);
+  const updateUserFullName = useChatStore((state) => state.updateUserFullName);
 
   // Support either MongoDB's _id or an id field.
   const userId = user?._id || user?.id;
@@ -26,6 +27,33 @@ function App() {
       socket.off("onlineUsers", setOnlineUsers);
     };
   }, [setOnlineUsers]);
+
+  // Listen for profile name changes from other users.
+  useEffect(() => {
+    const handleProfileUpdated = ({ userId, fullName }) => {
+      // Update the name in contacts, chats, and the selected conversation.
+      updateUserFullName(userId, fullName);
+
+      // Update our own authentication state if this event is for us.
+      const currentUser = useAuthStore.getState().user;
+      const currentUserId = currentUser?._id || currentUser?.id;
+
+      if (currentUserId?.toString() === userId?.toString()) {
+        useAuthStore.setState({
+          user: {
+            ...currentUser,
+            fullName,
+          },
+        });
+      }
+    };
+
+    socket.on("profileUpdated", handleProfileUpdated);
+
+    return () => {
+      socket.off("profileUpdated", handleProfileUpdated);
+    };
+  }, [updateUserFullName]);
 
   // Manage the Socket.io connection based on authentication state.
   useEffect(() => {

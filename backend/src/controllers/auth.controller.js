@@ -3,6 +3,7 @@ import User from "../models/user.model.js";
 import { generateToken } from "../utils/auth.utils.js";
 import cloudinary from "../config/cloudinary.js";
 import sendWelcomeEmail from "../services/email.service.js";
+import { getIO } from "../config/socket.js";
 
 /**
  * @name signup
@@ -207,6 +208,90 @@ export const updateProfile = async (req, res, next) => {
     });
   } catch (error) {
     console.error("Update profile error:", error);
+    next(error);
+  }
+};
+
+/**
+ * @name updateFullName
+ * @description Update the authenticated user's full name.
+ * @access Private
+ */
+export const updateFullName = async (req, res, next) => {
+  try {
+    const { fullName } = req.body;
+
+    // Validate that a name was provided as a string.
+    if (typeof fullName !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Full name is required.",
+      });
+    }
+
+    // Trim leading/trailing spaces and normalize repeated spaces.
+    const normalizedFullName = fullName.trim().replace(/\s+/g, " ");
+
+    // Validate the normalized name.
+    if (normalizedFullName.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: "Full name must contain at least 2 characters.",
+      });
+    }
+
+    if (normalizedFullName.length > 50) {
+      return res.status(400).json({
+        success: false,
+        message: "Full name cannot exceed 50 characters.",
+      });
+    }
+
+    // Find the authenticated user.
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    // Avoid unnecessary database writes and socket events.
+    if (user.fullName === normalizedFullName) {
+      return res.status(200).json({
+        success: true,
+        message: "Name is already up to date.",
+        user: {
+          id: user._id,
+          fullName: user.fullName,
+          email: user.email,
+          profilePic: user.profilePic,
+        },
+      });
+    }
+
+    // Save the updated name in MongoDB.
+    user.fullName = normalizedFullName;
+    await user.save();
+
+    // Notify connected clients to update this user's displayed name.
+    // This is a silent data update, not a user-facing notification.
+    getIO().emit("profileUpdated", {
+      userId: user._id.toString(),
+      fullName: user.fullName,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Full name updated successfully.",
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        profilePic: user.profilePic,
+      },
+    });
+  } catch (error) {
     next(error);
   }
 };
