@@ -1,0 +1,297 @@
+import bcrypt from "bcryptjs";
+import User from "../models/user.model.js";
+import { generateToken } from "../utils/auth.utils.js";
+import cloudinary from "../config/cloudinary.js";
+import sendWelcomeEmail from "../services/email.service.js";
+import { getIO } from "../config/socket.js";
+
+/**
+ * @name signup
+ * @description Register a new user with full name, email, and password.
+ * @access Public
+ */
+export const signup = async (req, res, next) => {
+  try {
+    const { fullName, email, password } = req.body;
+
+    // Normalize user-provided values before storing them.
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedFullName = fullName.trim().replace(/\s+/g, " ");
+
+    // Check whether an account already exists with the provided email.
+    const existingUser = await User.findOne({
+      email: normalizedEmail,
+    });
+
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: "User already exists.",
+      });
+    }
+
+    // Hash the user's password before storing it in the database.
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    const user = await User.create({
+      fullName: normalizedFullName,
+      email: normalizedEmail,
+      password: hashedPassword,
+    });
+
+    try {
+      await sendWelcomeEmail(user.email, user.fullName);
+    } catch (error) {
+      console.error("Failed to send welcome email:", error);
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "User registered successfully.",
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        profilePic: user.profilePic,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @name login
+ * @description Login an existing user using email and password.
+ * @access Public
+ */
+export const login = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    // Normalize the email before querying the database.
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Find the user associated with the provided email.
+    const user = await User.findOne({
+      email: normalizedEmail,
+    });
+
+    // Use a generic error message to avoid revealing whether an account exists.
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password.",
+      });
+    }
+
+    // Compare the provided password with the stored hashed password.
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password.",
+      });
+    }
+
+    // Generate JWT and store it in an HTTP-only cookie.
+    generateToken(user._id, res);
+
+    return res.status(200).json({
+      success: true,
+      message: "User logged in successfully.",
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        profilePic: user.profilePic,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @name logout
+ * @description Logout the current user by clearing the JWT authentication cookie.
+ * @access Public
+ */
+export const logout = async (req, res, next) => {
+  try {
+    // Clear the JWT cookie from the client.
+    res.clearCookie("token", {
+      httpOnly: true,
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+      secure: process.env.NODE_ENV === "production",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "User logged out successfully.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @name checkAuth
+ * @description Check whether the current user is authenticated and return their details.
+ * @access Private
+ */
+export const checkAuth = async (req, res, next) => {
+  try {
+    // Find the authenticated user from the database.
+    const user = await User.findById(req.user.userId).select("-password");
+
+    return res.status(200).json({
+      success: true,
+      message: "User is authenticated.",
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        profilePic: user.profilePic,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @name updateProfile
+ * @description Update the authenticated user's profile picture.
+ * @access Private
+ */
+export const updateProfile = async (req, res, next) => {
+  try {
+    const { profilePic } = req.body;
+
+    // Ensure a profile picture was provided.
+    if (!profilePic) {
+      return res.status(400).json({
+        success: false,
+        message: "Profile picture is required.",
+      });
+    }
+
+    // Find the authenticated user from the database.
+    const user = await User.findById(req.user.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    // Upload the profile picture to Cloudinary.
+    const uploadResponse = await cloudinary.uploader.upload(profilePic);
+
+    // Update the user's profile picture with the Cloudinary URL.
+    user.profilePic = uploadResponse.secure_url;
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile picture updated successfully.",
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        profilePic: user.profilePic,
+      },
+    });
+  } catch (error) {
+    console.error("Update profile error:", error);
+    next(error);
+  }
+};
+
+/**
+ * @name updateFullName
+ * @description Update the authenticated user's full name.
+ * @access Private
+ */
+export const updateFullName = async (req, res, next) => {
+  try {
+    const { fullName } = req.body;
+
+    // Validate that a name was provided as a string.
+    if (typeof fullName !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Full name is required.",
+      });
+    }
+
+    // Trim leading/trailing spaces and normalize repeated spaces.
+    const normalizedFullName = fullName.trim().replace(/\s+/g, " ");
+
+    // Validate the normalized name.
+    if (normalizedFullName.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: "Full name must contain at least 2 characters.",
+      });
+    }
+
+    if (normalizedFullName.length > 50) {
+      return res.status(400).json({
+        success: false,
+        message: "Full name cannot exceed 50 characters.",
+      });
+    }
+
+    // Find the authenticated user.
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    // Avoid unnecessary database writes and socket events.
+    if (user.fullName === normalizedFullName) {
+      return res.status(200).json({
+        success: true,
+        message: "Name is already up to date.",
+        user: {
+          id: user._id,
+          fullName: user.fullName,
+          email: user.email,
+          profilePic: user.profilePic,
+        },
+      });
+    }
+
+    // Save the updated name in MongoDB.
+    user.fullName = normalizedFullName;
+    await user.save();
+
+    // Notify connected clients to update this user's displayed name.
+    // This is a silent data update, not a user-facing notification.
+    getIO().emit("profileUpdated", {
+      userId: user._id.toString(),
+      fullName: user.fullName,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Full name updated successfully.",
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        profilePic: user.profilePic,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
