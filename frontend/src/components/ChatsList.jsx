@@ -4,7 +4,6 @@ import UsersLoadingSkeleton from "./UsersLoadingSkeleton";
 import NoChatsFound from "./NoChatsFound";
 import DeleteConversationModal from "./DeleteConversationModal";
 import { Trash2 } from "lucide-react";
-import toast from "react-hot-toast";
 
 const ChatsList = () => {
   const {
@@ -13,7 +12,6 @@ const ChatsList = () => {
     getMyChatPartners,
     setSelectedUser,
     onlineUsers,
-    deleteConversation,
   } = useChatStore();
 
   const [conversationToDelete, setConversationToDelete] = useState(null);
