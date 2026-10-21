@@ -1,122 +1,106 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect } from "react";
+import { RouterProvider } from "react-router";
+import { Toaster } from "react-hot-toast";
+
+import useAuthStore from "./store/useAuthStore";
+import useChatStore from "./store/useChatStore";
+import router from "./app.routes";
+import { socket } from "./services/socket";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const { checkAuth, user, isCheckingAuth } = useAuthStore();
+  const setOnlineUsers = useChatStore((state) => state.setOnlineUsers);
+  const updateUserFullName = useChatStore((state) => state.updateUserFullName);
+
+  // Support either MongoDB's _id or an id field.
+  const userId = user?._id || user?.id;
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  // Listen for online-user updates from the backend.
+  useEffect(() => {
+    socket.on("onlineUsers", setOnlineUsers);
+
+    return () => {
+      socket.off("onlineUsers", setOnlineUsers);
+    };
+  }, [setOnlineUsers]);
+
+  // Listen for profile name changes from other users.
+  useEffect(() => {
+    const handleProfileUpdated = ({ userId, fullName }) => {
+      // Update the name in contacts, chats, and the selected conversation.
+      updateUserFullName(userId, fullName);
+
+      // Update our own authentication state if this event is for us.
+      const currentUser = useAuthStore.getState().user;
+      const currentUserId = currentUser?._id || currentUser?.id;
+
+      if (currentUserId?.toString() === userId?.toString()) {
+        useAuthStore.setState({
+          user: {
+            ...currentUser,
+            fullName,
+          },
+        });
+      }
+    };
+
+    socket.on("profileUpdated", handleProfileUpdated);
+
+    return () => {
+      socket.off("profileUpdated", handleProfileUpdated);
+    };
+  }, [updateUserFullName]);
+
+  // Manage the Socket.io connection based on authentication state.
+  useEffect(() => {
+    // Wait until the initial authentication check finishes.
+    if (isCheckingAuth) return;
+
+    // Connect only when an authenticated user exists.
+    if (userId) {
+      socket.connect();
+    } else {
+      socket.disconnect();
+    }
+
+    // Disconnect when the app unmounts or the user changes.
+    return () => {
+      socket.disconnect();
+    };
+  }, [userId, isCheckingAuth]);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-900 p-4">
+      {/* FIXED APP BACKGROUND: GRID */}
+      <div
+        className="pointer-events-none fixed inset-0"
+        style={{
+          backgroundImage: `
+                        linear-gradient(to right, #4f4f4f2e 1px, transparent 1px),
+                        linear-gradient(to bottom, #4f4f4f2e 1px, transparent 1px)
+                    `,
+          backgroundSize: "14px 24px",
+        }}
+      />
 
-      <div className="ticks"></div>
+      {/* BACKGROUND GLOW: TOP LEFT */}
+      <div className="pointer-events-none fixed -left-4 top-0 size-96 bg-pink-500 opacity-20 blur-[100px]" />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {/* BACKGROUND GLOW: BOTTOM RIGHT */}
+      <div className="pointer-events-none fixed -bottom-4 -right-4 size-96 bg-cyan-500 opacity-20 blur-[100px]" />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      {/* APPLICATION ROUTES */}
+      <div className="relative z-10 w-full">
+        <RouterProvider router={router} />
+      </div>
+
+      <Toaster position="top-right" />
+    </div>
+  );
 }
 
-export default App
+export default App;

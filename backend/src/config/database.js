@@ -1,9 +1,12 @@
 import mongoose from "mongoose";
-
-// Force Node.js to use Google DNS
 import dns from "dns";
-dns.setDefaultResultOrder("ipv4first");
-dns.setServers(["8.8.8.8", "8.8.4.4"]);
+
+// Keep the DNS workaround for local development only.
+// Production hosting should use its own DNS configuration.
+if (process.env.NODE_ENV !== "production") {
+    dns.setDefaultResultOrder("ipv4first");
+    dns.setServers(["8.8.8.8", "8.8.4.4"]);
+}
 
 const connectToDatabase = async () => {
     try {
@@ -11,7 +14,9 @@ const connectToDatabase = async () => {
         console.log("MongoDB connected successfully");
     } catch (error) {
         console.error("MongoDB connection failed:", error.message);
-        process.exit(1);
+
+        // Stop startup if the database connection fails.
+        throw error;
     }
 };
 
