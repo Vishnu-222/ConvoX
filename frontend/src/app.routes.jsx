@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router";
 import Login from "./pages/Login";
 import SignUpPage from "./pages/SignupPage";
 import ChatPage from "./pages/ChatPage";
@@ -21,6 +21,10 @@ const router = createBrowserRouter([
         <ChatPage />
       </ProtectedRoute>
     ),
+  },
+  {
+    path: "/",
+    element: <Navigate to="/chat" replace />,
   },
   {
     path: "*",
